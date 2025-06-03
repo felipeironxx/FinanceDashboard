@@ -1,0 +1,37 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: finance_user
+      POSTGRES_PASSWORD: finance_pass
+      POSTGRES_DB: finance_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    restart: on-failure
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://finance_user:finance_pass@db:5432/finance_db
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    restart: on-failure
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
