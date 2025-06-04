@@ -9,3 +9,13 @@ CREATE TABLE IF NOT EXISTS months (
     saldo_anterior NUMERIC DEFAULT 0,
     saldo_final NUMERIC DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS transactions (
+    id SERIAL PRIMARY KEY,
+    months_id INTEGER, -- declara a coluna
+    tipo VARCHAR(20) NOT NULL,
+    descricao TEXT NOT NULL,
+    valor NUMERIC DEFAULT 0,
+    data DATE,
+    FOREIGN KEY (months_id) REFERENCES months(id) -- define a foreign key
+);
