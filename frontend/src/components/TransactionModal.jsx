@@ -96,7 +96,7 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
                 className="border p-1 w-24"
               />
               <input
-                type="date"
+                type="text"
                 value={t.date}
                 onChange={e => handleEdit(t.id, 'date', e.target.value)}
                 className="border p-1"
@@ -130,7 +130,7 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
               className="border p-2 w-24"
             />
             <input
-              type="date"
+              type="text"
               value={date}
               onChange={e => setDate(e.target.value)}
               className="border p-2"
