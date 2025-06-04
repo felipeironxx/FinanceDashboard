@@ -28,13 +28,13 @@ export default function NewMonthModal({ onClose, onCreated }) {
       <div className="bg-white rounded p-6 w-80">
         <h3 className="text-lg font-semibold mb-4">Novo Mês de Faturamento</h3>
         <label className="block mb-2">
-          Mês (ex: fev)
+          Mês (ex: 2)
           <input
             type="text"
             className="border p-2 w-full"
             value={month}
             onChange={e => setMonth(e.target.value.toLowerCase())}
-            placeholder="fev"
+            placeholder="2"
           />
         </label>
         <label className="block mb-4">
