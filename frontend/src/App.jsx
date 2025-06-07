@@ -7,9 +7,9 @@ export default function App() {
   const [showNewModal, setShowNewModal] = useState(false);
 
   async function fetchMonths() {
-    const res = await fetch('http://localhost:4000/months');
-    const data = await res.json();
-    setMonths(data);
+    const res = await fetch('http://192.168.0.8:4000/months');
+    const date = await res.json();
+    setMonths(date);
   }
 
   useEffect(() => {

@@ -10,7 +10,7 @@ export default function EditModal({ month, field, onClose, onUpdated }) {
   };
 
   async function handleSave() {
-    const response = await fetch(`http://localhost:4000/months/${month.id}`, {
+    const response = await fetch(`http://192.168.0.8:4000/months/${month.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

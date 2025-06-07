@@ -1,118 +1,142 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { recalculateFrom } = require('./months');
 
-// Função para atualizar o total de um tipo no mês correspondente
-function atualizarTotalDoTipo(month_id, tipo) {
-  return new Promise((resolve, reject) => {
-    const sqlSoma = `
-      SELECT SUM(valor) as total
-      FROM transactions
-      WHERE month_id = ? AND tipo = ?
-    `;
-    db.get(sqlSoma, [month_id, tipo], (err, row) => {
-      if (err) return reject(err);
+// 🔄 Atualiza o total do tipo (itau, nubank, etc) no mês correspondente
+async function atualizarTotalDoTipo(monthsId, type) {
+  const sqlSoma = `
+    SELECT COALESCE(SUM(valor), 0) AS total
+    FROM transactions
+    WHERE months_id = $1 AND tipo = $2
+  `;
 
-      const total = row.total || 0;
+  const somaResult = await db.query(sqlSoma, [monthsId, type]);
+  const total = somaResult.rows[0].total;
 
-      const sqlUpdate = `
-        UPDATE months
-        SET ${tipo} = ?
-        WHERE id = ?
-      `;
-      db.run(sqlUpdate, [total, month_id], function (err) {
-        if (err) return reject(err);
-        resolve(total);
-      });
-    });
-  });
+  const sqlUpdate = `
+    UPDATE months
+    SET ${type} = $1
+    WHERE id = $2
+  `;
+
+  await db.query(sqlUpdate, [total, monthsId]);
+
+  return total;
 }
 
-// Buscar todas as transações de um mês e tipo
-router.get('/', (req, res) => {
-  const { month_id, tipo } = req.query;
-  const sql = `
-    SELECT * FROM transactions
-    WHERE month_id = ? AND tipo = ?
-    ORDER BY data ASC
-  `;
-  db.all(sql, [month_id, tipo], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
-  });
-});
+// 🔍 Buscar todas as transações de um mês e tipo
+router.get('/', async (req, res) => {
+  const { monthsId, type } = req.query;
 
-// Criar uma nova transação
-router.post('/', (req, res) => {
-  const { month_id, tipo, descricao, valor, data } = req.body;
-  const sql = `
-    INSERT INTO transactions (month_id, tipo, descricao, valor, data)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  const params = [month_id, tipo, descricao, valor, data];
+  if (!monthsId || !type) {
+    return res.status(400).json({ error: 'Parâmetros monthsId e type são obrigatórios' });
+  }
 
-  db.run(sql, params, function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-
-    atualizarTotalDoTipo(month_id, tipo)
-      .then(() => {
-        res.json({ id: this.lastID, ...req.body });
-      })
-      .catch(err => res.status(500).json({ error: err.message }));
-  });
-});
-
-// Editar uma transação existente
-router.put('/:id', (req, res) => {
-  const { month_id, tipo, descricao, valor, data } = req.body;
-
-  const sqlBusca = 'SELECT * FROM transactions WHERE id = ?';
-  db.get(sqlBusca, [req.params.id], (err, transacaoAtual) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!transacaoAtual) return res.status(404).json({ error: 'Transaction not found' });
-
-    const sqlUpdate = `
-      UPDATE transactions
-      SET month_id = ?, tipo = ?, descricao = ?, valor = ?, data = ?
-      WHERE id = ?
+  try {
+    const sql = `
+      SELECT id, months_id AS "monthsId", tipo AS "type", descricao AS "description",
+             valor AS "value", data AS "date"
+      FROM transactions
+      WHERE months_id = $1 AND tipo = $2
+      ORDER BY data ASC
     `;
-    const params = [month_id, tipo, descricao, valor, data, req.params.id];
-
-    db.run(sqlUpdate, params, function (err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: 'Transaction not found' });
-
-      const promessas = [];
-      promessas.push(atualizarTotalDoTipo(month_id, tipo));
-
-      if (tipo !== transacaoAtual.tipo) {
-        promessas.push(atualizarTotalDoTipo(month_id, transacaoAtual.tipo));
-      }
-
-      Promise.all(promessas)
-        .then(() => res.json({ message: 'Transaction updated' }))
-        .catch(err => res.status(500).json({ error: err.message }));
-    });
-  });
+    const result = await db.query(sql, [monthsId, type]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Deletar uma transação
-router.delete('/:id', (req, res) => {
-  const sqlBusca = 'SELECT * FROM transactions WHERE id = ?';
-  db.get(sqlBusca, [req.params.id], (err, transacao) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!transacao) return res.status(404).json({ error: 'Transaction not found' });
+// ➕ Criar uma nova transação
+router.post('/', async (req, res) => {
+  const { monthsId, type, description, value, date } = req.body;
 
-    const sqlDelete = 'DELETE FROM transactions WHERE id = ?';
-    db.run(sqlDelete, [req.params.id], function (err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: 'Transaction not found' });
+  try {
+    const sql = `
+      INSERT INTO transactions (months_id, tipo, descricao, valor, data)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `;
+    const result = await db.query(sql, [monthsId, type, description, value, date]);
 
-      atualizarTotalDoTipo(transacao.month_id, transacao.tipo)
-        .then(() => res.json({ message: 'Transaction deleted' }))
-        .catch(err => res.status(500).json({ error: err.message }));
-    });
-  });
+    await atualizarTotalDoTipo(monthsId, type);
+
+    // 🔄 Recalcular os saldos após alteração
+    const monthResult = await db.query('SELECT month, year FROM months WHERE id = $1', [monthsId]);
+    const { month, year } = monthResult.rows[0];
+    await recalculateFrom(month, year);
+
+    res.json({ id: result.rows[0].id, monthsId, type, description, value, date });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✏️ Editar uma transação existente
+router.put('/:id', async (req, res) => {
+  const { monthsId, type, description, value, date } = req.body;
+  const { id } = req.params;
+
+  try {
+    const busca = await db.query('SELECT * FROM transactions WHERE id = $1', [id]);
+    const transacaoAtual = busca.rows[0];
+
+    if (!transacaoAtual) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const sql = `
+      UPDATE transactions
+      SET months_id = $1, tipo = $2, descricao = $3, valor = $4, data = $5
+      WHERE id = $6
+    `;
+    await db.query(sql, [monthsId, type, description, value, date, id]);
+
+    // Atualiza o tipo atual
+    await atualizarTotalDoTipo(monthsId, type);
+
+    // Se o tipo foi alterado, atualiza o tipo antigo também
+    if (type !== transacaoAtual.tipo) {
+      await atualizarTotalDoTipo(monthsId, transacaoAtual.tipo);
+    }
+
+    // 🔄 Recalcular os saldos após alteração
+    const monthResult = await db.query('SELECT month, year FROM months WHERE id = $1', [monthsId]);
+    const { month, year } = monthResult.rows[0];
+    await recalculateFrom(month, year);
+
+    res.json({ message: 'Transaction updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ❌ Deletar uma transação
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const busca = await db.query('SELECT * FROM transactions WHERE id = $1', [id]);
+    const transacao = busca.rows[0];
+
+    if (!transacao) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    await db.query('DELETE FROM transactions WHERE id = $1', [id]);
+
+    await atualizarTotalDoTipo(transacao.months_id, transacao.tipo);
+
+    // 🔄 Recalcular os saldos após exclusão
+    const monthResult = await db.query('SELECT month, year FROM months WHERE id = $1', [transacao.months_id]);
+    const { month, year } = monthResult.rows[0];
+    await recalculateFrom(month, year);
+
+    res.json({ message: 'Transaction deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

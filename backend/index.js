@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const monthsRoutes = require('./routes/months');
+const { router: monthsRoutes } = require('./routes/months');
 const transactionsRoutes = require('./routes/transactions');
 
 const app = express();

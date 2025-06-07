@@ -10,7 +10,7 @@ export default function NewMonthModal({ onClose, onCreated }) {
       return;
     }
 
-    const response = await fetch('http://localhost:4000/months', {
+    const response = await fetch('http://192.168.0.8:4000/months', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month, year }),

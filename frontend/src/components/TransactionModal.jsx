@@ -13,9 +13,9 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
   };
 
   async function fetchTransactions() {
-    const res = await fetch(`http://localhost:4000/transactions?monthId=${month.id}&type=${type}`);
-    const data = await res.json();
-    setTransactions(data);
+    const res = await fetch(`http://192.168.0.8:4000/transactions?monthsId=${month.id}&type=${type}`);
+    const date = await res.json();
+    setTransactions(date);
   }
 
   useEffect(() => {
@@ -28,11 +28,11 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
       return;
     }
 
-    await fetch('http://localhost:4000/transactions', {
+    await fetch('http://192.168.0.8:4000/transactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        monthId: month.id,
+        monthsId: month.id,
         type,
         description,
         value: Number(value),
@@ -50,7 +50,7 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
   async function handleDelete(id) {
     if (!window.confirm('Deseja realmente excluir?')) return;
 
-    await fetch(`http://localhost:4000/transactions/${id}`, {
+    await fetch(`http://192.168.0.8:4000/transactions/${id}`, {
       method: 'DELETE',
     });
 
@@ -59,11 +59,13 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
   }
 
   async function handleEdit(id, field, newValue) {
-    await fetch(`http://localhost:4000/transactions/${id}`, {
+    const transaction = transactions.find(t => t.id === id);
+
+    await fetch(`http://192.168.0.8:4000/transactions/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...transactions.find(t => t.id === id),
+        ...transaction,
         [field]: field === 'value' ? Number(newValue) : newValue,
       }),
     });
@@ -74,26 +76,26 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded p-6 w-[500px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded p-6 max-w-[90vw] min-w-[300px] max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold mb-4">
           Lançamentos - {typeMap[type]}
         </h3>
 
         <div className="space-y-4">
           {transactions.map(t => (
-            <div key={t.id} className="flex gap-2 items-center">
+            <div key={t.id} className="grid grid-cols-[1fr_100px_120px_auto] gap-2 items-center">
               <input
                 type="text"
                 value={t.description}
                 onChange={e => handleEdit(t.id, 'description', e.target.value)}
-                className="border p-1 flex-1"
+                className="border p-1"
               />
               <input
                 type="number"
                 step="0.01"
                 value={t.value}
                 onChange={e => handleEdit(t.id, 'value', e.target.value)}
-                className="border p-1 w-24"
+                className="border p-1"
               />
               <input
                 type="text"
@@ -131,6 +133,7 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
             />
             <input
               type="text"
+              placeholder="Data"
               value={date}
               onChange={e => setDate(e.target.value)}
               className="border p-2"
@@ -154,5 +157,6 @@ export default function TransactionModal({ month, type, onClose, onUpdated }) {
         </div>
       </div>
     </div>
+
   );
 }
